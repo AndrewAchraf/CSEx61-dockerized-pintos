@@ -91,7 +91,7 @@ struct thread
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
-
+   
     /*-----------For Advance Schedule----------*/
     int nice;
     real recent_cpu;
@@ -106,6 +106,8 @@ struct thread
     int donated_priority;               /* Priority donated from it's aquired locks */
  	 struct lock *waits_for;             /* Lock thread waits for. */
     struct list acquired_locks;         /* Locks the thread currently holds. */
+    struct list ready_list;
+    struct list all_list;
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
