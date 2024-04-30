@@ -374,7 +374,8 @@ int
 max(int x, int y){
   return x > y? x : y;
 }
-static void 
+static
+void 
 update_priority_after_release(){
     struct thread *t = thread_current();
 
