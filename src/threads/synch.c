@@ -29,6 +29,7 @@
 #include "threads/synch.h"
 #include <stdio.h>
 #include <string.h>
+#include "thread.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 
@@ -177,7 +178,7 @@ lock_init (struct lock *lock)
 {
   ASSERT (lock != NULL);
   lock->donated_priority = PRI_MIN;
-  
+
   lock->holder = NULL;
   sema_init (&lock->semaphore, 1);
 }
@@ -197,7 +198,11 @@ lock_acquire (struct lock *lock)
   ASSERT (!intr_context ());
   ASSERT (!lock_held_by_current_thread (lock));
 
-  sema_down (&lock->semaphore);
+  bool success = lock_try_acquire (lock);
+  if (!success){
+    ///////////////////////////////to be implemented/////////////////////
+  }
+
   lock->holder = thread_current ();
 }
 
@@ -217,7 +222,9 @@ lock_try_acquire (struct lock *lock)
 
   success = sema_try_down (&lock->semaphore);
   if (success)
+  {
     lock->holder = thread_current ();
+  }
   return success;
 }
 
@@ -336,4 +343,24 @@ cond_broadcast (struct condition *cond, struct lock *lock)
 
   while (!list_empty (&cond->waiters))
     cond_signal (cond, lock);
+}
+
+
+void
+donate(struct thread *t,struct lock *lock) {
+  
+    struct thread *holder = lock->holder; 
+
+if (lock == NULL||holder == NULL || t == NULL ) return;
+
+    if (max(t->priority,t->donated_priority) > max(holder->priority,holder->donated_priority)) 
+             holder->donated_priority = max(t->priority,t->donated_priority);
+    
+    donate(holder , holder->waits_for);
+      
+    }
+
+int 
+max(int x, int y){
+  return x > y? x : y;
 }
