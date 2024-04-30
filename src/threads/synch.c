@@ -200,8 +200,11 @@ lock_acquire (struct lock *lock)
 
   bool success = lock_try_acquire (lock);
   if (!success){
+          //thread failed to acquire the lock , so it waits on it
           thread_current()->waits_for= lock;
+          //donate 
           donate(thread_current(),lock);
+          
           sema_down(&lock->semaphore);
   }
 }
@@ -223,8 +226,11 @@ lock_try_acquire (struct lock *lock)
   success = sema_try_down (&lock->semaphore);
   if (success)
   {
+    // If the lock is not held by any thread then current thread can acquire it.
     lock->holder = thread_current ();
+    //the thread no longer waits for the lock.
     thread_current()->waits_for= NULL;
+    //add the lock to the list of acquired locks of the current thread.
     list_push_back (&(lock->holder->acquired_locks), &lock->elem);
 
   }
@@ -246,7 +252,9 @@ lock_release (struct lock *lock)
   lock->holder = NULL;
 
   if (!thread_mlfqs) {
+    // remove the lock from the list of acquired locks
           list_remove(&lock->elem);
+    //update  priorities
           update_priority_after_release();
   }
   sema_up (&lock->semaphore);
