@@ -70,10 +70,10 @@ static struct thread *running_thread (void);
 static struct thread *next_thread_to_run (void);
 static void init_thread (struct thread *, const char *name, int priority);
 static bool is_thread (struct thread *) UNUSED;
-                                        static void *alloc_frame (struct thread *, size_t size);
-                                        static void schedule (void);
-                                        void thread_schedule_tail (struct thread *prev);
-                                        static tid_t allocate_tid (void);
+static void *alloc_frame (struct thread *, size_t size);
+static void schedule (void);
+void thread_schedule_tail (struct thread *prev);
+static tid_t allocate_tid (void);
 
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
@@ -88,8 +88,8 @@ static bool is_thread (struct thread *) UNUSED;
 
    It is not safe to call thread_current() until this function
    finishes. */
-        void
-        thread_init (void)
+void
+thread_init (void)
 {
     ASSERT (intr_get_level () == INTR_OFF);
 
@@ -129,26 +129,36 @@ thread_start (void)
 
 void updateLoadAverage() {
     if(thread_current() == idle_thread){
+        enum intr_level old_level = intr_disable();
         load_average = mul_fp_fp(div_fp_fp(int_to_fp(59), int_to_fp(60)), load_average);
+        intr_set_level(old_level);
         return;
     }
     // not idle thread
+    enum intr_level old_level = intr_disable();
     int ready_threads = list_size(&ready_list) + 1; // one is for current running thread
     load_average = add_fp_fp(mul_fp_fp(div_fp_fp(int_to_fp(59), int_to_fp(60)), load_average),mul_fp_fp(div_fp_fp(int_to_fp(1), int_to_fp(60)), int_to_fp(ready_threads)));
+    intr_set_level(old_level);
 }
 void updateRecentCPUForALL(real fraction){
+    enum intr_level old_level = intr_disable();
     struct list_elem *element;
     for (element = list_begin (&all_list); element != list_end (&all_list);element = list_next (element)){
         struct thread *t = list_entry (element, struct thread, allelem);
         t->recent_cpu = add_fp_int(mul_fp_fp(fraction, t->recent_cpu), t->nice);
     }
+    intr_set_level(old_level);
 }
 void updatePriority(struct thread *t, void* aux){ //use update priority in setting nice value to check weather to yield current thread or not
+    enum intr_level old_level = intr_disable();
     t->priority = PRI_MAX - fp_to_int_round_to_nearest(div_fp_int(t->recent_cpu, 4)) - (t->nice * 2);
+    intr_set_level(old_level);
 }
 void updatePriorityForAll(){
     //update priority of each thread in the system
+    enum intr_level old_level = intr_disable();
     thread_foreach(updatePriority,NULL);
+    intr_set_level(old_level);
 }
 void AdvancedScheduleHandler(){
     struct thread *currentThread = thread_current();
@@ -265,9 +275,18 @@ thread_create (const char *name, int priority,
     struct thread *currentThread = thread_current();
     if (thread_mlfqs) {
         /* Inheritance */
-        t->nice = currentThread->nice;
-        t->recent_cpu = currentThread->recent_cpu;
+        if(initial_thread){
+            t->nice = 0;
+            t->recent_cpu = 0;
+        }
+        else{
+            t->nice = currentThread->nice;
+            t->recent_cpu = currentThread->recent_cpu;
+        }
     }
+
+    if(t->priority > thread_current()->priority)
+        thread_yield();
 
     return tid;
 }
@@ -307,6 +326,7 @@ thread_unblock (struct thread *t)
     ASSERT (t->status == THREAD_BLOCKED);
     //list_push_back (&ready_list, &t->elem);
     list_insert_ordered(&ready_list, &t->elem, compare_Priority, NULL);//inserts descendingly ordered according to priority
+    list_sort(&ready_list, compare_Priority, NULL);
     t->status = THREAD_READY;
     intr_set_level (old_level);
 }
@@ -379,6 +399,7 @@ thread_yield (void)
     if (cur != idle_thread){
         //list_push_back (&ready_list, &cur->elem);
         list_insert_ordered(&ready_list, &cur->elem, compare_Priority, NULL);//inserts descendingly ordered according to priority
+        list_sort(&ready_list, compare_Priority, NULL);
     }
     cur->status = THREAD_READY;
     schedule ();
@@ -407,7 +428,19 @@ void
 thread_set_priority (int new_priority)
 {
     enum intr_level   old_level = intr_disable ();
-    thread_current ()->priority = new_priority;
+    struct thread *currentThread = thread_current();
+    currentThread->priority = new_priority;
+    if(list_size(&ready_list) > 0){
+        //list not empty
+        struct list_elem *element = list_front(&ready_list);
+        struct thread *t = list_entry(element, struct thread, elem);
+        if(t->priority > currentThread->priority){
+            intr_set_level(old_level);
+            thread_yield();
+            return;
+
+        }
+    }
     intr_set_level(old_level);
 }
 
@@ -416,6 +449,7 @@ int
 thread_get_priority (void)
 {
     return thread_current ()->priority;
+
 }
 
 /* Sets the current thread's nice value to NICE. */
