@@ -1,9 +1,11 @@
 #include "threads/thread.h"
+#include <algorithm>
 #include <debug.h>
 #include <stddef.h>
 #include <random.h>
 #include <stdio.h>
 #include <string.h>
+#include "synch.h"
 #include "threads/flags.h"
 #include "threads/interrupt.h"
 #include "threads/intr-stubs.h"
@@ -415,7 +417,7 @@ thread_set_priority (int new_priority)
 int
 thread_get_priority (void)
 {
-    return thread_current ()->priority;
+    return t->priority > t->donated_priority ? t->priority : t->donated_priority;
 }
 
 /* Sets the current thread's nice value to NICE. */
@@ -545,6 +547,11 @@ init_thread (struct thread *t, const char *name, int priority)
     ASSERT (t != NULL);
     ASSERT (PRI_MIN <= priority && priority <= PRI_MAX);
     ASSERT (name != NULL);
+
+    //priority scheduling and donation
+    t->donated_priority = PRI_MIN;
+    list_init(t->acquired_locks);
+    lock_init(t->waits_for);
 
     memset (t, 0, sizeof *t);
     t->status = THREAD_BLOCKED;
@@ -683,4 +690,22 @@ bool compare_Priority(const struct list_elem *a, const struct list_elem *b, void
     struct thread *thread_one = list_entry(a, struct thread, elem);
     struct thread *thread_two = list_entry(b, struct thread, elem);
     return thread_one->priority > thread_two->priority;
+}
+int
+threads_get_max_priority(void) {
+  struct list_elem *element;
+  struct thread *t;
+  int max = 0;
+  element = list_begin (&ready_list); 
+  while (element!= list_end (&ready_list)) {
+    element = list_next (elem);
+    // element is the pointer to the list i want to get its entry
+    //struct thread the struct contains the list
+    //elem : its name in struct thread
+    t = list_entry (element, struct thread,elem); 
+    if (t->priority > max) {
+      max = t->priority;
+    }
+  }
+  return max;
 }
