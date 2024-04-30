@@ -29,6 +29,7 @@
 #include "threads/synch.h"
 #include <stdio.h>
 #include <string.h>
+#include "synch.h"
 #include "thread.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
@@ -199,10 +200,10 @@ lock_acquire (struct lock *lock)
 
   bool success = lock_try_acquire (lock);
   if (!success){
-    ///////////////////////////////to be implemented/////////////////////
+          thread_current()->waits_for= lock;
+          donate(thread_current(),lock);
+          sema_down(&lock->semaphore);
   }
-
-  lock->holder = thread_current ();
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -223,6 +224,9 @@ lock_try_acquire (struct lock *lock)
   if (success)
   {
     lock->holder = thread_current ();
+    thread_current()->waits_for= NULL;
+    list_push_back (&(lock->holder->acquired_locks), &lock->elem);
+
   }
   return success;
 }
@@ -239,7 +243,12 @@ lock_release (struct lock *lock)
   ASSERT (lock_held_by_current_thread (lock));
    
   lock->holder = NULL;
+  if (!thread_mlfqs) {
+          list_remove(&lock->elem);
+         /////////////priority update///////////////////////////
+  }
   sema_up (&lock->semaphore);
+  
 }
 
 /* Returns true if the current thread holds LOCK, false
