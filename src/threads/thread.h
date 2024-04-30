@@ -4,15 +4,16 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
+#include "threads/fixed-point.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
-  {
+{
     THREAD_RUNNING,     /* Running thread. */
     THREAD_READY,       /* Not running but ready to run. */
     THREAD_BLOCKED,     /* Waiting for an event to trigger. */
     THREAD_DYING        /* About to be destroyed. */
-  };
+};
 
 /* Thread identifier type.
    You can redefine this to whatever type you like. */
@@ -80,15 +81,23 @@ typedef int tid_t;
    only because they are mutually exclusive: only a thread in the
    ready state is on the run queue, whereas only a thread in the
    blocked state is on a semaphore wait list. */
+real load_average;
 struct thread
-  {
+{
     /* Owned by thread.c. */
     tid_t tid;                          /* Thread identifier. */
     enum thread_status status;          /* Thread state. */
     char name[16];                      /* Name (for debugging purposes). */
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
-    struct list_elem allelem;           /* List element for all threads list. */
+    struct list_elem allelem;          /* List element for all threads list. */
+
+    /*-----------For Advance Schedule----------*/
+    int nice;
+    real recent_cpu;
+
+    /*-----------For Alarm Clock----------*/
+    int wakeUpTime;                    /* Time to wake up the thread */
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
@@ -100,7 +109,7 @@ struct thread
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
-  };
+};
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
@@ -138,4 +147,11 @@ void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
+bool compare_wakeUpTime(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
+bool compare_Priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
+void updateLoadAverage();
+void updateRecentCPUForALL(real fraction);
+void updatePriorityForAll();
+void AdvancedScheduleHandler();
+void updatePriority(struct thread *t, void* aux);
 #endif /* threads/thread.h */
