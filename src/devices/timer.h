@@ -26,4 +26,7 @@ void timer_ndelay (int64_t nanoseconds);
 
 void timer_print_stats (void);
 
+/*##########       ADDED        ############*/
+void checkToWakeUPNow();
+
 #endif /* devices/timer.h */
