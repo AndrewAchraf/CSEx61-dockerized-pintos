@@ -68,7 +68,8 @@ sema_down (struct semaphore *sema)
   old_level = intr_disable ();
   while (sema->value == 0) 
     {
-      list_push_back (&sema->waiters, &thread_current ()->elem);
+      //list_push_back (&sema->waiters, &thread_current ()->elem);
+        list_insert_ordered(&sema->waiters, &thread_current()->elem, compare_Priority, NULL);
       thread_block ();
     }
   sema->value--;
@@ -305,6 +306,7 @@ cond_wait (struct condition *cond, struct lock *lock)
   
   sema_init (&waiter.semaphore, 0);
   list_push_back (&cond->waiters, &waiter.elem);
+//  list_insert_ordered(&cond->waiters, &waiter.elem, cmp_cond_priority, NULL);
   lock_release (lock);
   sema_down (&waiter.semaphore);
   lock_acquire (lock);
@@ -325,9 +327,16 @@ cond_signal (struct condition *cond, struct lock *lock UNUSED)
   ASSERT (!intr_context ());
   ASSERT (lock_held_by_current_thread (lock));
 
-  if (!list_empty (&cond->waiters)) 
-    sema_up (&list_entry (list_pop_front (&cond->waiters),
-                          struct semaphore_elem, elem)->semaphore);
+  if (!list_empty (&cond->waiters)) {
+    /* compares the priority of the threads in the waiters list of the semaphore
+     * bec the list of cond inserts semaphore elements which contains the list of waiters so in each element of list
+     * in cond waiting list the element is a semaphore element so we need to get the first element in the semaphore list
+     * which is definitely with higher priority than the rest of the elements in the semaphore list bec it is sorted */
+      list_sort(&cond->waiters, cmp_cond_priority, NULL);
+      sema_up (&list_entry (list_pop_front (&cond->waiters),
+      struct semaphore_elem, elem)->semaphore);
+  }
+
 }
 
 /* Wakes up all threads, if any, waiting on COND (protected by
@@ -344,4 +353,17 @@ cond_broadcast (struct condition *cond, struct lock *lock)
 
   while (!list_empty (&cond->waiters))
     cond_signal (cond, lock);
+}
+/*compares the priority of the threads in the waiters list of the semaphore
+ * bec the list of cond inserts semaphore elements which contains the list of waiters so in each element of list
+ * in cond waiting list the element is a semaphore element so we need to get the first element in the semaphore list
+ * which is definitely with higher priority than the rest of the elements in the semaphore list bec it is sorted */
+
+bool cmp_cond_priority(struct list_elem *first, struct list_elem *second, void *aux)
+{
+    struct semaphore_elem *fsem = list_entry (first, struct semaphore_elem, elem);
+    struct semaphore_elem *ssem = list_entry (second, struct semaphore_elem, elem);
+
+    return list_entry(list_front(&fsem->semaphore.waiters), struct thread, elem)->priority > list_entry (list_front(&ssem->semaphore.waiters), struct thread, elem)->priority;
+
 }
