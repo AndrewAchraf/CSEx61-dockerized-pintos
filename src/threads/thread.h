@@ -90,17 +90,22 @@ struct thread
     char name[16];                      /* Name (for debugging purposes). */
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
-    struct list_elem allelem;          /* List element for all threads list. */
+    struct list_elem allelem;           /* List element for all threads list. */
 
     /*-----------For Advance Schedule----------*/
     int nice;
     real recent_cpu;
 
     /*-----------For Alarm Clock----------*/
-    int wakeUpTime;                    /* Time to wake up the thread */
-
+    int wakeUpTime;                     /* Time to wake up the thread */
+ 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
+
+    /* Priority scheduling and donation */
+    int donated_priority;               /* Priority donated from it's aquired locks */
+ 	 struct lock *waits_for;             /* Lock thread waits for. */
+    struct list acquired_locks;         /* Locks the thread currently holds. */
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
@@ -154,4 +159,5 @@ void updateRecentCPUForALL(real fraction);
 void updatePriorityForAll();
 void AdvancedScheduleHandler();
 void updatePriority(struct thread *t, void* aux);
+int threads_get_max_priority(void) ;
 #endif /* threads/thread.h */
