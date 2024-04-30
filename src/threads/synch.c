@@ -177,7 +177,6 @@ void
 lock_init (struct lock *lock)
 {
   ASSERT (lock != NULL);
-  lock->donated_priority = PRI_MIN;
 
   lock->holder = NULL;
   sema_init (&lock->semaphore, 1);
@@ -238,7 +237,7 @@ lock_release (struct lock *lock)
 {
   ASSERT (lock != NULL);
   ASSERT (lock_held_by_current_thread (lock));
-
+   
   lock->holder = NULL;
   sema_up (&lock->semaphore);
 }
@@ -358,7 +357,7 @@ if (lock == NULL||holder == NULL || t == NULL ) return;
     
     donate(holder , holder->waits_for);
       
-    }
+}
 
 int 
 max(int x, int y){
