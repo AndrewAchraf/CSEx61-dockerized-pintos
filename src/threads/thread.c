@@ -1,5 +1,4 @@
 #include "threads/thread.h"
-#include <algorithm>
 #include <debug.h>
 #include <stddef.h>
 #include <random.h>
@@ -16,7 +15,6 @@
 #include "threads/fixed-point.h"
 #include "threads/fixed-point.c"
 #include "devices/timer.h"
-
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -552,8 +550,8 @@ init_thread (struct thread *t, const char *name, int priority)
 
     //priority scheduling and donation
     t->donated_priority = PRI_MIN;
-    list_init(t->acquired_locks);
-    lock_init(t->waits_for);
+    list_init(&t->acquired_locks);
+    lock_init(&t->waits_for);
 
     memset (t, 0, sizeof *t);
     t->status = THREAD_BLOCKED;
@@ -700,7 +698,7 @@ threads_get_max_priority(void) {
   int max = 0;
   element = list_begin (&ready_list); 
   while (element!= list_end (&ready_list)) {
-    element = list_next (elem);
+    element = list_next (element);
     // element is the pointer to the list i want to get its entry
     //struct thread the struct contains the list
     //elem : its name in struct thread
