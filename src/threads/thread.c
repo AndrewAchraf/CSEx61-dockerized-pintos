@@ -129,34 +129,26 @@ thread_start (void)
 
 void updateLoadAverage() {
     if(thread_current() == idle_thread){
-        enum intr_level old_level = intr_disable();
         load_average = mul_fp_fp(div_fp_fp(int_to_fp(59), int_to_fp(60)), load_average);
-        intr_set_level(old_level);
         return;
     }
     // not idle thread
     int ready_threads = list_size(&ready_list) + 1; // one is for current running thread
-    enum intr_level old_level = intr_disable();
     load_average = add_fp_fp(mul_fp_fp(div_fp_fp(int_to_fp(59), int_to_fp(60)), load_average),mul_fp_fp(div_fp_fp(int_to_fp(1), int_to_fp(60)), int_to_fp(ready_threads)));
-    intr_set_level(old_level);
 }
 void updateRecentCPUForALL(real fraction){
-    enum intr_level old_level = intr_disable();
     struct list_elem *element;
     for (element = list_begin (&all_list); element != list_end (&all_list);element = list_next (element)){
         struct thread *t = list_entry (element, struct thread, allelem);
         t->recent_cpu = add_fp_int(mul_fp_fp(fraction, t->recent_cpu), t->nice);
     }
-    intr_set_level(old_level);
 }
 void updatePriority(struct thread *t, void* aux){ //use update priority in setting nice value to check weather to yield current thread or not
     t->priority = PRI_MAX - fp_to_int_round_to_nearest(div_fp_int(t->recent_cpu, 4)) - (t->nice * 2);
 }
 void updatePriorityForAll(){
-    enum intr_level old_level = intr_disable();
     //update priority of each thread in the system
     thread_foreach(updatePriority,NULL);
-    intr_set_level(old_level);
 }
 void AdvancedScheduleHandler(){
     struct thread *currentThread = thread_current();
