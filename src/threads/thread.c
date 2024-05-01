@@ -547,13 +547,13 @@ init_thread (struct thread *t, const char *name, int priority)
     ASSERT (t != NULL);
     ASSERT (PRI_MIN <= priority && priority <= PRI_MAX);
     ASSERT (name != NULL);
-
+memset (t, 0, sizeof *t);
     //priority scheduling and donation
     t->donated_priority = PRI_MIN;
     list_init(&t->acquired_locks);
     lock_init(&t->waits_for);
 
-    memset (t, 0, sizeof *t);
+    
     t->status = THREAD_BLOCKED;
     strlcpy (t->name, name, sizeof t->name);
     t->stack = (uint8_t *) t + PGSIZE;
