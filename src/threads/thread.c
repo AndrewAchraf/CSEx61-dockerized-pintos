@@ -444,12 +444,19 @@ thread_set_priority (int new_priority)
     intr_set_level(old_level);
 }
 
-/* Returns the current thread's priority. */
+/* Returns the current thread's priority. In the presence of priority donation, returns the higher (donated) priority.*/
 int
 thread_get_priority (void)
 {
-    return thread_current ()->priority;
 
+//    struct thread curr_thread = thread_current();
+//    list_sort(&thread_current()->acquired_locks, compare_waiting_threads_priority, NULL);
+//    struct lock lock_holding_max_priority = list_entry(list_max(&thread_current()->acquired_locks, compare_waiting_threads_priority, NULL), struct lock, elem);
+//    thread_current() -> donated_priority = list_entry( list_head(&lock_holding_max_priority.semaphore.waiters), struct thread, elem)->priority;
+    if(thread_current()->donated_priority > thread_current()->priority){
+        return thread_current()->donated_priority;
+    }
+    return thread_current ()->priority;
 }
 
 /* Sets the current thread's nice value to NICE. */
@@ -579,6 +586,11 @@ init_thread (struct thread *t, const char *name, int priority)
     ASSERT (t != NULL);
     ASSERT (PRI_MIN <= priority && priority <= PRI_MAX);
     ASSERT (name != NULL);
+
+    //priority scheduling and donation
+    t->donated_priority = PRI_MIN;
+    list_init(&t->acquired_locks);
+    lock_init(&t->waits_for);
 
     memset (t, 0, sizeof *t);
     t->status = THREAD_BLOCKED;
@@ -717,4 +729,29 @@ bool compare_Priority(const struct list_elem *a, const struct list_elem *b, void
     struct thread *thread_one = list_entry(a, struct thread, elem);
     struct thread *thread_two = list_entry(b, struct thread, elem);
     return thread_one->priority > thread_two->priority;
+}
+
+bool compare_waiting_threads_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED){
+    struct lock *lock_one = list_entry(a, struct lock, elem);
+    struct lock *lock_two = list_entry(b, struct lock, elem);
+    return list_entry(list_front(&lock_one->semaphore.waiters), struct thread, elem)->priority > list_entry (list_front(&lock_two->semaphore.waiters), struct thread, elem)->priority;
+}
+
+int
+threads_get_max_priority(void) {
+    struct list_elem *element;
+    struct thread *t;
+    int max = 0;
+    element = list_begin (&ready_list);
+    while (element!= list_end (&ready_list)) {
+        element = list_next (element);
+        // element is the pointer to the list i want to get its entry
+        //struct thread the struct contains the list
+        //elem : its name in struct thread
+        t = list_entry (element, struct thread,elem);
+        if (t->priority > max) {
+            max = t->priority;
+        }
+    }
+    return max;
 }

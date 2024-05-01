@@ -104,7 +104,7 @@ struct thread
 
     /* Priority scheduling and donation */
     int donated_priority;               /* Priority donated from it's aquired locks */
- 	 struct lock *waits_for;             /* Lock thread waits for. */
+    struct lock *waits_for;             /* Lock thread waits for. */
     struct list acquired_locks;         /* Locks the thread currently holds. */
 
 
@@ -147,6 +147,7 @@ void thread_foreach (thread_action_func *, void *);
 
 int thread_get_priority (void);
 void thread_set_priority (int);
+bool compare_waiting_threads_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
 
 int thread_get_nice (void);
 void thread_set_nice (int);
