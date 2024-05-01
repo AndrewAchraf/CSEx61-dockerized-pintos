@@ -434,7 +434,7 @@ thread_set_priority (int new_priority)
     /*sets the actual priority to the new priority and leaves the priority as it is*/
     currentThread -> actual_priority = new_priority;
     //priority etghayaret
-    broadcastChangeInLocksPriority(currentThread);
+    broadcastChangeInPriority(currentThread);
     /* If there are threads with higher priority than the current thread, call
    THREAD YIELD. */
     if(list_size(&ready_list) > 0){

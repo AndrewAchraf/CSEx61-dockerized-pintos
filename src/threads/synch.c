@@ -71,6 +71,9 @@ sema_down (struct semaphore *sema)
       //list_push_back (&sema->waiters, &thread_current ()->elem);
       list_insert_ordered(&(sema->waiters), &thread_current()->elem, compare_Priority, NULL);
       list_sort(&sema->waiters, compare_Priority, NULL);
+      if(!thread_mlfqs){
+          broadcastChangeInPriority(thread_current());
+      }
       thread_block ();
     }
   sema->value--;
@@ -272,7 +275,7 @@ lock_release (struct lock *lock)
         //remove the lock from the list of acquired locks of the current thread.
         list_remove(&lock->elem);
         //the thread holding the lock now left t so make threads know this and check priority
-        broadcastChangeInLocksPriority(lock->holder);
+        broadcastChangeInPriority(lock->holder);
 
         lock->maxPriority = PRI_MIN;
     }
@@ -417,7 +420,7 @@ bool cmp_locks_priority(struct list_elem *first, struct list_elem *second, void 
  * Called by a lock to notify its holder thread of a change in priority,
  * so the thread check the new priority and chooses the appropriate new priority.
  */
-void broadcastChangeInLocksPriority(struct  thread* t){
+void broadcastChangeInPriority(struct  thread* t){
     if(!list_empty(&(t->locks_held))){
         /* if the thread holds another locks it sets its priority to the max bet its actual priority or
          * the max in the list of the held threads
@@ -436,6 +439,7 @@ void broadcastChangeInLocksPriority(struct  thread* t){
     handleNestedDonation(t);
 }
 // Handles the nested donation procedure
+void
 handleNestedDonation(struct thread* t){
     if (t->lock_waiting == NULL)
         //thread not waiting for anything

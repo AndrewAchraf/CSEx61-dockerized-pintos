@@ -47,8 +47,8 @@ void cond_broadcast (struct condition *, struct lock *);
 
 bool cmp_cond_priority(struct list_elem *first, struct list_elem *second, void *aux);
 bool cmp_locks_priority(struct list_elem *first, struct list_elem *second, void *aux);
-void broadcastChangeInLocksPriority(struct  thread* t);
-handleNestedDonation(struct thread* t);
+void broadcastChangeInPriority(struct  thread* t);
+void handleNestedDonation(struct thread* t);
 /* Optimization barrier.
 
    The compiler will not reorder operations across an
