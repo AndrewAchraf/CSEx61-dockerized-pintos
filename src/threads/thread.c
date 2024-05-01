@@ -593,7 +593,6 @@ init_thread (struct thread *t, const char *name, int priority)
     memset (t, 0, sizeof *t);
 
     list_init(&t->locks_held);
-    lock_init(&t->lock_waiting);
 
     t->status = THREAD_BLOCKED;
     strlcpy (t->name, name, sizeof t->name);
