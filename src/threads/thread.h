@@ -102,10 +102,10 @@ struct thread
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
 
-    /* Priority scheduling and donation */
-    int donated_priority;               /* Priority donated from it's aquired locks */
-    struct lock *waits_for;             /* Lock thread waits for. */
-    struct list acquired_locks;         /* Locks the thread currently holds. */
+    /*-------- Priority scheduling and donation ------------------ */
+    int actual_priority;                /* Priority represents actual priority of thread  from it's aquired locks */
+    struct lock *lock_waiting;          /* Lock thread is waiting for.(Thread benn locked by this lock) */
+    struct list locks_held;             /* Locks the thread currently holds.(All locks held) */
 
 
 #ifdef USERPROG
@@ -147,7 +147,6 @@ void thread_foreach (thread_action_func *, void *);
 
 int thread_get_priority (void);
 void thread_set_priority (int);
-bool compare_waiting_threads_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
 
 int thread_get_nice (void);
 void thread_set_nice (int);
@@ -161,5 +160,4 @@ void updateRecentCPUForALL(real fraction);
 void updatePriorityForAll();
 void AdvancedScheduleHandler();
 void updatePriority(struct thread *t, void* aux);
-int threads_get_max_priority(void) ;
 #endif /* threads/thread.h */

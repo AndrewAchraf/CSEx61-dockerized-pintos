@@ -22,7 +22,8 @@ struct lock
   {
     struct thread *holder;        /* Thread holding lock (for debugging). */
     struct semaphore semaphore;   /* Binary semaphore controlling access. */
-    struct list_elem  elem;  /* Used to link the locks a thread currently holds. */
+    struct list_elem  elem;       /* Used to link the locks a thread currently holds. */
+    int maxPriority;              /* Maximum priority of all the threads waiting for this lock */
   };
 
 void lock_init (struct lock *);
@@ -45,6 +46,9 @@ void cond_signal (struct condition *, struct lock *);
 void cond_broadcast (struct condition *, struct lock *);
 
 bool cmp_cond_priority(struct list_elem *first, struct list_elem *second, void *aux);
+bool cmp_locks_priority(struct list_elem *first, struct list_elem *second, void *aux);
+void broadcastChangeInLocksPriority(struct  thread* t);
+handleNestedDonation(struct thread* t);
 /* Optimization barrier.
 
    The compiler will not reorder operations across an
