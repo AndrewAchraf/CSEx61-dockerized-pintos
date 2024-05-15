@@ -70,6 +70,16 @@ syscall_handler (struct intr_frame *f )
         {
             //handle exec system call
             handle_sys_exec(f);
+
+
+            //valid_in_virtual_memory((int *)f->esp + 1);
+            char *file_name = (char *)(*((int *)f->esp + 1));
+            if (file_name == NULL) call_exit(-1);
+
+            lock_acquire(&file_lock);
+            f->eax = process_execute(file_name);
+            lock_release(&file_lock);
+
             break;
         }
         case SYS_WAIT:
