@@ -12,6 +12,7 @@
 #include "filesys/file.h"
 #include "filesys/filesys.h"
 #include "threads/flags.h"
+#include "threads/synch.c"
 #include "threads/init.h"
 #include "threads/interrupt.h"
 #include "threads/palloc.h"
@@ -40,8 +41,18 @@ process_execute (const char *file_name)
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+
+  /*parent thread should wait for the child to load the executable file*/
+  sema_down(&thread_current()->sync_between_child_parent);
+
+  /*When the child is done loading the executable file, the parent should check if the child made it or not*/
+  if (!thread_current()->child_success_creation){
+      return TID_ERROR;
+  }
+
   if (tid == TID_ERROR)
-    palloc_free_page (fn_copy); 
+    palloc_free_page (fn_copy);
+
   return tid;
 }
 
@@ -61,17 +72,26 @@ start_process (void *file_name_)
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (file_name, &if_.eip, &if_.esp);
 
+
   /* If load failed, quit. */
   palloc_free_page (file_name);
-  if (!success) 
-    thread_exit ();
+  if (!success){
+      thread_current()->parent->child_success_creation = false;
+      sema_up(thread_current()->parent->sync_between_child_parent);
+  }
 
-  /* Start the user process by simulating a return from an
-     interrupt, implemented by intr_exit (in
-     threads/intr-stubs.S).  Because intr_exit takes all of its
-     arguments on the stack in the form of a `struct intr_frame',
-     we just point the stack pointer (%esp) to our stack frame
-     and jump to it. */
+  /* if the child made it and loaded the executable file, then we should add it to the children list of the parent */
+  list_push_back(thread_current()->parent->children, thread_current()->child_elem);
+  thread_current()->parent->child_success_creation = true;
+  sema_up(thread_current()->parent->sync_between_child_parent);
+  sema_down(&thread_current()->sync_between_child_parent);
+
+    /* Start the user process by simulating a return from an
+       interrupt, implemented by intr_exit (in
+       threads/intr-stubs.S).  Because intr_exit takes all of its
+       arguments on the stack in the form of a `struct intr_frame',
+       we just point the stack pointer (%esp) to our stack frame
+       and jump to it. */
   asm volatile ("movl %0, %%esp; jmp intr_exit" : : "g" (&if_) : "memory");
   NOT_REACHED ();
 }
@@ -86,9 +106,35 @@ start_process (void *file_name_)
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int
-process_wait (tid_t child_tid UNUSED) 
+process_wait (tid_t child_tid)
 {
-  return -1;
+    /*Check if the child_tid is valid or not*/
+    if (child_tid == TID_ERROR || child_tid == thread_current()->tid || child_tid == thread_current()->tid_waiting_for){
+        return -1;
+    }
+    /*Find the child thread using its tid*/
+    struct thread *child = NULL;
+    struct list_elem *e;
+    bool valid = false;
+    for (e = list_begin(thread_current()->children); e != list_end(thread_current()->children); e = list_next(e)){
+        struct thread *t = list_entry(e, struct thread, child_elem);
+        if (t->tid == child_tid){
+            child = t;
+            valid = true;
+            break;
+        }
+    }
+    if (!valid){
+        return -1;
+    }
+    thread_current()->tid_waiting_for = child_tid;
+    /*Remove the child from the children list of the parent*/
+    list_remove(e);
+    /*Unblock the child using its tid to let it finish its execution*/
+    sema_up(&child->sync_between_child_parent);
+    /*Block the parent until the child finishes its execution*/
+    sema_down(&thread_current()->wait_for_child_exit);
+
 }
 
 /* Free the current process's resources. */
@@ -96,6 +142,41 @@ void
 process_exit (void)
 {
   struct thread *cur = thread_current ();
+
+  if (cur->parent != NULL){
+        /*check if the parent is waiting for this child to finish its execution*/
+        if (cur->parent->tid_waiting_for == cur->tid){
+            cur->parent->child_status = thread_current()->exit_status; // Set parent's exit status
+            cur->parent->tid_waiting_for = -1; // reset waiting for tid
+            cur->parent->child_success_creation = false; // reset child creation success
+            sema_up(&cur->parent->wait_for_child_exit); // Wake up parent
+        }
+  }
+
+  /*Close all the files opened by the current process*/
+  file_close(thread_current()->executable_file);
+  thread_current()->executable_file = NULL;
+  thread_current()->parent = NULL;
+  struct list* process_files = &thread_current()->list_of_open_file;
+  for(struct list_elem* i = list_begin(process_files);i !=list_end(process_files) ; ){
+        struct open_file* file = list_entry(i, struct open_file , elem);
+        i=list_next(i);
+        file_close(file->file);
+        list_remove(&file->elem);
+        free(file);
+  }
+
+  /*Remove all the children of the current thread*/
+  struct list* all_children = &thread_current()->children;
+  struct list_elem * i = list_begin(all_children);
+  while(i != list_end(all_children)){
+        struct thread * child = list_entry(i,struct thread , child_elem);
+        i = list_next(i);
+        child->parent = NULL;
+        sema_up(&child->sync_between_child_parent);
+        list_remove(&child->child_elem);
+  }
+
   uint32_t *pd;
 
   /* Destroy the current process's page directory and switch back
@@ -114,6 +195,7 @@ process_exit (void)
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
+
 }
 
 /* Sets up the CPU for running user code in the current
