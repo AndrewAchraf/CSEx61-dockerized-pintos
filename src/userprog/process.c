@@ -355,6 +355,8 @@ load (const char *file_name, void (**eip) (void), void **esp)
         goto done;
     }
 
+    thread_current()->executable_file = file;
+
     /* Read program headers. */
     file_ofs = ehdr.e_phoff;
     for (i = 0; i < ehdr.e_phnum; i++)
@@ -419,6 +421,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
         goto done;
 
     push_args(file_name, esp);
+    free(copy); // free file name copy
 
     /* Start address. */
     *eip = (void (*) (void)) ehdr.e_entry;
