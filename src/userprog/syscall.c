@@ -18,8 +18,6 @@ static void syscall_handler (struct intr_frame *);
 struct lock file_lock;
 
 
-
-
 /*  ######### Added  ############## */
 /**
  * ensure that the pointers and stack pointers used in system calls are valid,
@@ -31,19 +29,6 @@ bool valid_in_virtual_memory(void *val);
 bool valid_esp(struct intr_frame *f);
 
 void get_args (struct intr_frame *f, int *arg, int num_of_args);
-
-void handle_sys_halt();
-void handle_sys_exit(struct intr_frame *f);
-void handle_sys_exec(struct intr_frame *f);
-void handle_sys_wait(struct intr_frame *f);
-void handle_sys_create(struct intr_frame *f);
-void handle_sys_remove(struct intr_frame *f);
-void handle_sys_open(struct intr_frame *f);
-void handle_sys_filesize(struct intr_frame *f);
-void handle_sys_read(struct intr_frame *f);
-void handle_sys_seek(struct intr_frame *f);
-void handle_sys_write(struct intr_frame *f);
-void handle_sys_close(struct intr_frame *f);
 
 void
 syscall_init (void) 
@@ -86,7 +71,7 @@ syscall_handler (struct intr_frame *f )
         case SYS_WAIT:
         {
             //handle wait system call
-
+            handle_sys_wait(f);
             break;
         }
         case SYS_CREATE:
@@ -104,43 +89,43 @@ syscall_handler (struct intr_frame *f )
         case SYS_OPEN:
         {
             //handle open system call
-
+            handle_sys_open(f);
             break;
         }
         case SYS_FILESIZE:
         {
             //handle filesize system call
-
+            handle_sys_filesize(f);
             break;
         }
         case SYS_READ:
         {
             //handle read system call
-
+            handle_sys_read(f);
             break;
         }
         case SYS_WRITE:
         {
             //handle write system call
-
+            handle_sys_write(f);
             break;
         }
         case SYS_SEEK:
         {
             //handle seek system call
-
+            handle_sys_seek(f);
             break;
         }
         case SYS_TELL:
         {
             //handle tell system call
-
+            handle_sys_tell(f);
             break;
         }
         case SYS_CLOSE:
         {
             //handle close system call
-
+            handle_sys_close(f);
             break;
         }
         default:
@@ -184,7 +169,7 @@ void get_args (struct intr_frame *f, int *arg, int num_of_args)
         ptr = (int *)f->esp + i + 1;
         if (!valid_in_virtual_memory(ptr))
         {
-            exit(-1);
+            call_exit(-1);
         }
         arg[i] = *ptr;
     }
@@ -192,7 +177,7 @@ void get_args (struct intr_frame *f, int *arg, int num_of_args)
 void handle_sys_halt(){
     shutdown_power_off();
 }
-void exit(int status){
+void call_exit(int status){
     char *save_ptr;
     char *file_name = thread_current()->name;
     file_name = strtok_r(file_name, " ", &save_ptr);
@@ -206,10 +191,43 @@ void handle_sys_exit(struct intr_frame *f){
     // get the status from the stack and automatically the get args will check the validity of the pointer and exit if not valid
     get_args(f, &status, 1);
     f->eax = status;
-    exit(status);
+    call_exit(status);
 }
 
-bool create_file(const char *file, unsigned initial_size)
+
+
+tid_t  call_wait(tid_t tid)
+{
+    return process_wait(tid);
+}
+
+void handle_sys_wait(struct intr_frame *f)
+{
+    int arg[1];
+    get_args(f, &arg, 1);
+    tid_t tid = arg[0];
+    if(!valid_in_virtual_memory(tid))
+    {
+        call_exit(-1);
+    }
+    f->eax = call_wait(tid);
+}
+/* loop on all files opened by thread and return the one with fd required*/
+struct open_file *sys_file(int fd)
+{
+    struct open_file *ans=NULL;
+    struct list *list_of_files = &(thread_current()->list_of_open_file);
+    for (struct list_elem *cur = list_begin(list_of_files); cur != list_end(list_of_files); cur = list_next(cur))
+    {
+        struct open_file *cur_file = list_entry(cur, struct open_file, elem);
+        if ((cur_file->fd) == fd)
+        {
+            return cur_file;
+        }
+    }
+    return NULL;
+}
+bool call_create(const char *file, unsigned initial_size)
 {
     lock_acquire(&file_lock);
     bool success = filesys_create(file, initial_size);
@@ -225,13 +243,13 @@ void handle_sys_create(struct intr_frame *f)
     char *file = (char *)(arg[0]);
     if (!valid_in_virtual_memory(file))
     {
-        exit(-1);
+        call_exit(-1);
     }
     unsigned initial_size = (unsigned int *)arg[1];
-    f->eax = create_file(file, initial_size);
+    f->eax = call_create(file, initial_size);
 }
 
-bool remove_file(const char *file)
+bool call_remove(const char *file)
 {
     lock_acquire(&file_lock);
     bool success = filesys_remove(file);
@@ -246,7 +264,221 @@ void handle_sys_remove(struct intr_frame *f)
     char *file = (char *)(arg[0]);
     if (!valid_in_virtual_memory(file))
     {
-        exit(-1);
+        call_exit(-1);
     }
-    f->eax = remove_file(file);
+    f->eax = call_remove(file);
+}
+
+int call_open(const char *file)
+{
+    static unsigned long current_fd = 2;// 0 and 1 are reserved for stdin and stdout
+    lock_acquire(&file_lock);
+    struct file *f = filesys_open(file);
+    lock_release(&file_lock);
+    if (f == NULL)
+    {
+        // if file not found || failed to open
+        return -1;
+    }
+
+    struct open_file *new_file = (struct open_file *)malloc(sizeof(struct open_file));
+    new_file->file = f;
+    int file_fd = current_fd;
+    new_file->fd = current_fd;
+    lock_acquire(&file_lock);
+    current_fd++;
+    lock_release(&file_lock);
+    list_push_back(&(thread_current()->list_of_open_file), &(new_file->elem));
+    return file_fd;
+
+}
+void handle_sys_open(struct intr_frame *f)
+{
+    int arg[1];
+    get_args(f, &arg, 1);
+    char *file = (char *)(arg[0]);
+    if (!valid_in_virtual_memory(file))
+    {
+        call_exit(-1);
+    }
+    f->eax = call_open(file);
+}
+
+void handle_sys_filesize(struct intr_frame *f)
+{
+    int arg[1];
+    get_args(f, &arg, 1);
+    int fd = arg[0];
+    struct open_file *file = sys_file(fd);
+    if (file == NULL)
+    {
+        f->eax = -1;
+        return;
+    }
+    lock_acquire(&file_lock);
+    f->eax = file_length(file->file);
+    lock_release(&file_lock);
+}
+
+int call_read(int fd, void *buffer, unsigned size)
+{
+    if (fd == 0)
+    {
+        // read from keyboard
+        for (unsigned i = 0; i < size; i++)
+        {
+            lock_acquire(&file_lock);
+            *((char *)buffer + i) = input_getc();
+            lock_release(&file_lock);
+        }
+        return size;
+    }
+    struct open_file *file = sys_file(fd);
+    if (file == NULL)
+    {
+        return -1;
+    }
+    lock_acquire(&file_lock);
+    int bytes_read = file_read(file->file, buffer, size);
+    lock_release(&file_lock);
+    return bytes_read;
+}
+
+void handle_sys_read(struct intr_frame *f) {
+    int args[3];  // Array to hold the arguments
+
+    // Retrieve 3 arguments from the stack
+    get_args(f, args, 3);
+
+    int fd = args[0];  // File descriptor
+    char *buffer = (char *) args[1];  // Buffer to read into
+    unsigned size = (unsigned) args[2];  // Number of bytes to read
+
+    // Check if the buffer is valid
+    if (!valid_in_virtual_memory(buffer) || fd == 1) {
+        call_exit(-1);
+    }
+    f->eax = call_read(fd, buffer, size);
+}
+
+int call_write(int fd, const void *buffer, unsigned size)
+{
+    if (fd == 1)
+    {
+        // write to console
+        lock_acquire(&file_lock);
+        putbuf(buffer, size);
+        lock_release(&file_lock);
+        return size;
+    }
+    struct open_file *file = sys_file(fd);
+    if (file == NULL)
+    {
+        return -1;
+    }
+    lock_acquire(&file_lock);
+    int bytes_written = file_write(file->file, buffer, size);
+    lock_release(&file_lock);
+    return bytes_written;
+}
+
+void handle_sys_write(struct intr_frame *f)
+{
+    int args[3];  // Array to hold the arguments
+
+    // Retrieve 3 arguments from the stack
+    get_args(f, args, 3);
+
+    int fd = args[0];  // File descriptor
+    char *buffer = (char *) args[1];  // Buffer to write from
+    unsigned size = (unsigned) args[2];  // Number of bytes to write
+
+    // Check if the buffer is valid
+    if (!valid_in_virtual_memory(buffer) || fd == 0) {// check if the buffer is valid and the file descriptor is not 0, 0 is reserved for stdin
+        call_exit(-1);
+    }
+    f->eax = call_write(fd, buffer, size);
+}
+
+void call_seek(struct intr_frame *f)
+{
+    int args[2];  // Array to hold the arguments
+
+    // Retrieve 2 arguments from the stack
+    get_args(f, args, 2);
+
+    int fd = args[0];  // File descriptor
+    unsigned position = (unsigned) args[1];  // New position
+
+    struct open_file *file = sys_file(fd);
+    if (file == NULL)
+    {
+        f->eax = -1;
+        return;
+    }
+    lock_acquire(&file_lock);
+    file_seek(file->file, position);
+    f->eax = position;
+    lock_release(&file_lock);
+}
+
+void handle_sys_seek(struct intr_frame *f)
+{
+    call_seek(f);
+}
+
+void call_tell(struct intr_frame *f)
+{
+    int args[1];  // Array to hold the arguments
+
+    // Retrieve 1 argument from the stack
+    get_args(f, args, 1);
+
+    int fd = args[0];  // File descriptor
+
+    struct open_file *file = sys_file(fd);
+    if (file == NULL)
+    {
+        f->eax = -1;
+        return;
+    }
+    lock_acquire(&file_lock);
+    f->eax = file_tell(file->file);
+    lock_release(&file_lock);
+}
+
+void handle_sys_tell(struct intr_frame *f)
+{
+    call_tell(f);
+}
+
+int call_close(int fd)
+{
+    struct open_file *file = sys_file(fd);
+    if (file == NULL)
+    {
+        return -1;
+    }
+    lock_acquire(&file_lock);
+    file_close(file->file);
+    list_remove(&(file->elem));
+    free(file);
+    lock_release(&file_lock);
+    return 0;
+}
+
+void handle_sys_close(struct intr_frame *f)
+{
+    int args[1];  // Array to hold the arguments
+
+    // Retrieve 1 argument from the stack
+    get_args(f, args, 1);
+
+    int fd = args[0];  // File descriptor
+    if(fd == 0 || fd == 1)
+    {
+        // can't close stdin or stdout
+        call_exit(-1);
+    }
+    f->eax = call_close(fd);
 }
