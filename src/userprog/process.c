@@ -152,7 +152,8 @@ process_wait (tid_t child_tid)
     sema_up(&child->sync_between_child_parent);
     /*Block the parent until the child finishes its execution*/
     sema_down(&thread_current()->wait_for_child_exit);
-
+    /*Return the status of the child*/
+    return thread_current()->child_status;
 }
 
 /* Free the current process's resources. */
