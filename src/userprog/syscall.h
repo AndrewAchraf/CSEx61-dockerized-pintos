@@ -27,11 +27,11 @@ tid_t  call_wait(tid_t tid);
 /* Creates a new file called file initially initial_size bytes in size. Returns true if successful,
 false otherwise. Creating a new file does not open it: opening the new file is a separate
 operation which would require a open system call. */
-bool call_create(const char *file, unsigned initial_size);
+int call_create(const char *file, unsigned initial_size);
 /*Deletes the file called file. Returns true if successful, false otherwise. A file may be
 removed regardless of whether it is open or closed, and removing an open file
 does not close it.*/
-bool call_remove(const char* file);
+int call_remove(const char* file);
 /* Opens the file called file. Returns a nonnegative integer handle called a "file descriptor"
 (fd), or -1 if the file could not be opened. */
 int call_open(const char* file);
