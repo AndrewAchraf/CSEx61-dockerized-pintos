@@ -37,10 +37,7 @@ process_execute (const char *file_name)
     tid_t tid;
 
     char* copy ;
-    int length = strlen(file_name)+1;
-    copy = malloc(length);
-    strlcpy(copy, file_name, length);
-    char *token = strtok_r(copy, " ", &saveptr);
+
 
     /* Make a copy of FILE_NAME.
        Otherwise there's a race between the caller and load(). */
@@ -49,18 +46,25 @@ process_execute (const char *file_name)
         return TID_ERROR;
     strlcpy (fn_copy, file_name, PGSIZE);
 
-    char *f_name;
-    char *save_ptr;
-    f_name = malloc(strlen(file_name)+1);
-    strlcpy (f_name, file_name, strlen(file_name)+1);
-    f_name = strtok_r (f_name," ",&save_ptr);
+    int length = strlen(file_name)+1;
+    copy = malloc(length);
+    strlcpy(copy, file_name, length);
+    copy = strtok_r(copy, " ", &saveptr);
+
+    // char *f_name;
+    // char *save_ptr;
+    // f_name = malloc(strlen(file_name)+1);
+    // strlcpy (f_name, file_name, strlen(file_name)+1);
+    // f_name = strtok_r (f_name," ",&save_ptr);
 
     /* Create a new thread to execute FILE_NAME. */
-    tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
-    free(f_name);
+    tid = thread_create (copy, PRI_DEFAULT, start_process, fn_copy);
+
 
     /*parent thread should wait for the child to load the executable file*/
     sema_down(&thread_current()->sync_between_child_parent);
+
+    free(copy);
 
     /*When the child is done loading the executable file, the parent should check if the child made it or not*/
     if (!thread_current()->child_success_creation){

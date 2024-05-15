@@ -208,13 +208,18 @@ void handle_sys_exit(struct intr_frame *f){
 
 void handle_sys_exec(struct intr_frame *f)
 {
+    if (!valid_in_virtual_memory((int *)f->esp + 1))
+        call_exit(-1);
+
     int args[1];  // Array to store the argument
 
     // Retrieve the argument from the stack
     get_args(f, args, 1);
 
     char *file_name = (char *)args[0];  // Cast the first (and only) argument to char*
+//    lock_acquire(&file_lock);
     f->eax = process_execute(file_name);
+//    lock_release(&file_lock);
 }
 
 tid_t  call_wait(tid_t tid)
