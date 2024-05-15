@@ -62,14 +62,14 @@ process_execute (const char *file_name)
 
 
     /*parent thread should wait for the child to load the executable file*/
-    sema_down(&thread_current()->sync_between_child_parent);
+    sema_down(&thread_current()->wait_for_child_creation);
 
     free(copy);
 
     /*When the child is done loading the executable file, the parent should check if the child made it or not*/
-    if (!thread_current()->child_success_creation){
+    if (!thread_current()->child_created_successfully){
         return TID_ERROR;
-        sema_up(&thread_current()->sync_between_child_parent);
+        sema_up(&thread_current()->wait_for_child_creation);
     }
 
     if (tid == TID_ERROR)
@@ -99,16 +99,16 @@ start_process (void *file_name_)
     /* If load failed, quit. */
     palloc_free_page (file_name);
     if (!success){
-        thread_current()->parent->child_success_creation = false;
-        sema_up(&thread_current()->parent->sync_between_child_parent);
-        sema_down(&thread_current()->sync_between_child_parent);
+        thread_current()->parent->child_created_successfully = false;
+        sema_up(&thread_current()->parent->wait_for_child_creation);
+        sema_down(&thread_current()->wait_for_child_creation);
     }
 
     /* if the child made it and loaded the executable file, then we should add it to the children list of the parent */
     list_push_back(&thread_current()->parent->children, &thread_current()->child_elem);
-    thread_current()->parent->child_success_creation = true;
-    sema_up(&thread_current()->parent->sync_between_child_parent);
-    sema_down(&thread_current()->sync_between_child_parent);
+    thread_current()->parent->child_created_successfully = true;
+    sema_up(&thread_current()->parent->wait_for_child_creation);
+    sema_down(&thread_current()->wait_for_child_creation);
 
     /* Start the user process by simulating a return from an
        interrupt, implemented by intr_exit (in
@@ -155,7 +155,7 @@ process_wait (tid_t child_tid)
     /*Remove the child from the children list of the parent*/
     list_remove(e);
     /*Unblock the child using its tid to let it finish its execution*/
-    sema_up(&child->sync_between_child_parent);
+    sema_up(&child->wait_for_child_creation);
     /*Block the parent until the child finishes its execution*/
     sema_down(&thread_current()->wait_for_child_exit);
     /*Return the status of the child*/
@@ -173,7 +173,7 @@ process_exit (void)
         if (cur->parent->tid_waiting_for == cur->tid){
             cur->parent->child_status = thread_current()->exit_status; // Set parent's exit status
             cur->parent->tid_waiting_for = -1; // reset waiting for tid
-            cur->parent->child_success_creation = false; // reset child creation success
+            cur->parent->child_created_successfully = false; // reset child creation success
             sema_up(&cur->parent->wait_for_child_exit); // Wake up parent
         }
     }
@@ -198,7 +198,7 @@ process_exit (void)
         struct thread * child = list_entry(i,struct thread , child_elem);
         i = list_next(i);
         child->parent = NULL;
-        sema_up(&child->sync_between_child_parent);
+        sema_up(&child->wait_for_child_creation);
         list_remove(&child->child_elem);
     }
 

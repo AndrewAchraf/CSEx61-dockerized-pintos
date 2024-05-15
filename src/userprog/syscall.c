@@ -27,7 +27,7 @@ struct lock file_lock;
  * preventing the kernel from performing illegal memory accesses
  */
 // Check validation of virtual memory :)
-bool valid_in_virtual_memory(void *val);
+bool is_Valid_Pointer(void *val);
 // check validation of stack pointer
 bool valid_esp(struct intr_frame *f);
 
@@ -138,10 +138,11 @@ syscall_handler (struct intr_frame *f )
         default:
         {
             printf ("system call!\n");
+            //thread_exit ();
         }
     }
 
-  //thread_exit ();
+
 }
 /*
  * This function checks the validity of a given pointer with three major conditions:
@@ -159,13 +160,13 @@ Pointer has a corresponding physical page: The pagedir_get_page(thread_current()
  if there is a physical page mapped to the given virtual address. If there's no such mapping, the pointer is considered invalid for dereferencing.
  */
 
-bool valid_in_virtual_memory(void *ptr) {
+bool is_Valid_Pointer(void *ptr) {
     return ptr != NULL && is_user_vaddr(ptr) && pagedir_get_page(thread_current()->pagedir, ptr) != NULL;
 }
 // check validation of stack pointer
 bool valid_esp(struct intr_frame *f)
 {
-    return valid_in_virtual_memory((int *)f->esp) || ((*(int *)f->esp) < 0) || (*(int *)f->esp) > 12;
+    return is_Valid_Pointer((int *)f->esp) || ((*(int *)f->esp) < 0) || (*(int *)f->esp) > 12;
 }
 
 void get_args (struct intr_frame *f, int *arg, int num_of_args)
@@ -174,7 +175,7 @@ void get_args (struct intr_frame *f, int *arg, int num_of_args)
     for (int i = 0; i < num_of_args; i++)
     {
         ptr = (int *)f->esp + i + 1;
-        if (!valid_in_virtual_memory(ptr))
+        if (!is_Valid_Pointer(ptr))
         {
             call_exit(-1);
         }
@@ -208,7 +209,7 @@ void handle_sys_exit(struct intr_frame *f){
 
 void handle_sys_exec(struct intr_frame *f)
 {
-    if (!valid_in_virtual_memory((int *)f->esp + 1))
+    if (!is_Valid_Pointer((int *)f->esp + 1))
         call_exit(-1);
 
     int args[1];  // Array to store the argument
@@ -229,7 +230,7 @@ tid_t  call_wait(tid_t tid)
 
 void handle_sys_wait(struct intr_frame *f)
 {
-    if (!valid_in_virtual_memory((int *)f->esp + 1))
+    if (!is_Valid_Pointer((int *)f->esp + 1))
         call_exit(-1);
     tid_t tid = *((int *)f->esp + 1);
     f->eax = call_wait(tid);
@@ -250,7 +251,7 @@ void handle_sys_create(struct intr_frame *f)
     // Retrieve the argument from the stack
     get_args(f, args, 1);
     char *file = (char *)args[0];  // Cast the first (and only) argument to char*
-    if (!valid_in_virtual_memory(file))
+    if (!is_Valid_Pointer(file))
     {
         call_exit(-1);
     }
@@ -274,7 +275,7 @@ void handle_sys_remove(struct intr_frame *f)
     get_args(f, args, 1);
 
     char *file = (char *)args[0];  // Cast the first (and only) argument to char*
-    if (!valid_in_virtual_memory(file))
+    if (!is_Valid_Pointer(file))
     {
         call_exit(-1);
     }
@@ -314,7 +315,7 @@ void handle_sys_open(struct intr_frame *f)
     get_args(f, args, 1);
 
     char *file = (char *)args[0];  // Cast the first (and only) argument to char*
-    if (!valid_in_virtual_memory(file))
+    if (!is_Valid_Pointer(file))
     {
         call_exit(-1);
     }
@@ -392,7 +393,7 @@ void handle_sys_read(struct intr_frame *f) {
     int fd = args[0];  // First argument: file descriptor
     char *buffer = (char *)args[1];  // Second argument: buffer pointer
 
-    if (fd == 1 || !valid_in_virtual_memory(buffer))
+    if (fd == 1 || !is_Valid_Pointer(buffer))
     { // fail if fd is 1 means (stdout) or in valid in virtual memory
         call_exit(-1);
     }
@@ -432,7 +433,7 @@ void handle_sys_write(struct intr_frame *f)
     int fd = args[0];  // First argument: file descriptor
     char *buffer = (char *)args[1];  // Second argument: buffer pointer
 
-    if (fd == 0 || !valid_in_virtual_memory(buffer))
+    if (fd == 0 || !is_Valid_Pointer(buffer))
     { // fail, if fd is 0 (stdin), or its virtual memory
         call_exit(-1);
     }

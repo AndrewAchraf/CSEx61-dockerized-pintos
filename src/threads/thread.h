@@ -103,8 +103,8 @@ struct thread
     struct thread *parent;                      /* pointer to parent thread */
     struct list children;
     struct list_elem child_elem;                /* list_element for children list*/
-    bool child_success_creation;                /* determine if child made it and loaded or not */
-    struct semaphore sync_between_child_parent; /* make parent wait for child during load */
+    bool child_created_successfully;            /* determine if child made it and loaded or not */
+    struct semaphore wait_for_child_creation;   /* make parent wait for child during load */
     struct semaphore wait_for_child_exit;       /* for the parent, handling waiting for the child to exit  */
     tid_t tid_waiting_for;                      /* tid for the process we are waiting for, just wish it's in the children list*/
     int child_status;                           /* status of child when finished */
