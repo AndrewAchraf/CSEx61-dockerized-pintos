@@ -4,7 +4,11 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
-#include "threads/synch.h"
+#include <stdbool.h>
+#include <debug.h>
+#include <list.h>
+#include "threads/init.h"  // halt
+#include "threads/synch.h"  //locks
 
 /* States in a thread's life cycle. */
 enum thread_status

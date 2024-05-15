@@ -99,7 +99,7 @@ syscall_handler (struct intr_frame *f )
         {
             //handle remove system call
             handle_sys_remove(f);
-             break;
+            break;
         }
         case SYS_OPEN:
         {
@@ -211,9 +211,9 @@ void handle_sys_exit(struct intr_frame *f){
 
 bool create_file(const char *file, unsigned initial_size)
 {
-    lock_acquire(&required_lock);
+    lock_acquire(&file_lock);
     bool success = filesys_create(file, initial_size);
-    lock_release(&required_lock);
+    lock_release(&file_lock);
     return success;
 }
 
@@ -222,20 +222,20 @@ void handle_sys_create(struct intr_frame *f)
 {
     int arg[2];
     get_args(f, &arg, 2);
-    char *file = (char *)*(arg[0]);
+    char *file = (char *)(arg[0]);
     if (!valid_in_virtual_memory(file))
     {
-        sys_exit(-1);
+        exit(-1);
     }
-    unsigned initial_size = (unsigned)*(arg[1]);
+    unsigned initial_size = (unsigned int *)arg[1];
     f->eax = create_file(file, initial_size);
 }
 
-void remove_file(const char *file)
+bool remove_file(const char *file)
 {
-    lock_acquire(&required_lock);
+    lock_acquire(&file_lock);
     bool success = filesys_remove(file);
-    lock_release(&required_lock);
+    lock_release(&file_lock);
     return success;
 }
 
@@ -243,10 +243,10 @@ void handle_sys_remove(struct intr_frame *f)
 {
     int arg[1];
     get_args(f, &arg, 1);
-    char *file = (char *)*(arg[0]);
+    char *file = (char *)(arg[0]);
     if (!valid_in_virtual_memory(file))
     {
-        sys_exit(-1);
+        exit(-1);
     }
     f->eax = remove_file(file);
 }
