@@ -77,13 +77,13 @@ start_process (void *file_name_)
   palloc_free_page (file_name);
   if (!success){
       thread_current()->parent->child_success_creation = false;
-      sema_up(thread_current()->parent->sync_between_child_parent);
+      sema_up(&thread_current()->parent->sync_between_child_parent);
   }
 
   /* if the child made it and loaded the executable file, then we should add it to the children list of the parent */
-  list_push_back(thread_current()->parent->children, thread_current()->child_elem);
+  list_push_back(&thread_current()->parent->children, &thread_current()->child_elem);
   thread_current()->parent->child_success_creation = true;
-  sema_up(thread_current()->parent->sync_between_child_parent);
+  sema_up(&thread_current()->parent->sync_between_child_parent);
   sema_down(&thread_current()->sync_between_child_parent);
 
     /* Start the user process by simulating a return from an
@@ -116,7 +116,7 @@ process_wait (tid_t child_tid)
     struct thread *child = NULL;
     struct list_elem *e;
     bool valid = false;
-    for (e = list_begin(thread_current()->children); e != list_end(thread_current()->children); e = list_next(e)){
+    for (e = list_begin(&thread_current()->children); e != list_end(&thread_current()->children); e = list_next(e)){
         struct thread *t = list_entry(e, struct thread, child_elem);
         if (t->tid == child_tid){
             child = t;
