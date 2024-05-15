@@ -208,7 +208,12 @@ void handle_sys_exit(struct intr_frame *f){
 
 void handle_sys_exec(struct intr_frame *f)
 {
-    char *file_name = (char *)(*((int *)f->esp + 1));
+    int args[1];  // Array to store the argument
+
+    // Retrieve the argument from the stack
+    get_args(f, args, 1);
+
+    char *file_name = (char *)args[0];  // Cast the first (and only) argument to char*
     f->eax = process_execute(file_name);
 }
 
@@ -236,7 +241,10 @@ int call_create(const char *file, unsigned initial_size)
 /* it's job is checking validation in virtual memory if valid pass it to sys_create() */
 void handle_sys_create(struct intr_frame *f)
 {
-    char *file = (char *)*((int *)f->esp + 1);
+    int args[1];  // Array to store the file name pointer argument
+    // Retrieve the argument from the stack
+    get_args(f, args, 1);
+    char *file = (char *)args[0];  // Cast the first (and only) argument to char*
     if (!valid_in_virtual_memory(file))
     {
         call_exit(-1);
@@ -255,7 +263,12 @@ int call_remove(const char *file)
 
 void handle_sys_remove(struct intr_frame *f)
 {
-    char *file = (char *)(*((int *)f->esp + 1));
+    int args[1];  // Array to store the file name pointer argument
+
+    // Retrieve the argument from the stack
+    get_args(f, args, 1);
+
+    char *file = (char *)args[0];  // Cast the first (and only) argument to char*
     if (!valid_in_virtual_memory(file))
     {
         call_exit(-1);
@@ -290,7 +303,12 @@ int call_open(const char *file)
 }
 void handle_sys_open(struct intr_frame *f)
 {
-    char *file = (char *)(*((int *)f->esp + 1));
+    int args[1];  // Array to store the file name pointer argument
+
+    // Retrieve the argument from the stack
+    get_args(f, args, 1);
+
+    char *file = (char *)args[0];  // Cast the first (and only) argument to char*
     if (!valid_in_virtual_memory(file))
     {
         call_exit(-1);
@@ -361,8 +379,14 @@ int call_read(int fd, void *buffer, unsigned size)
 }
 
 void handle_sys_read(struct intr_frame *f) {
-    int fd = (int)(*((int *)f->esp + 1));
-    char *buffer = (char *)(*((int *)f->esp + 2));
+    int args[2];  // Array to store the arguments: fd and buffer pointer
+
+    // Retrieve the two arguments from the stack
+    get_args(f, args, 2);
+
+    int fd = args[0];  // First argument: file descriptor
+    char *buffer = (char *)args[1];  // Second argument: buffer pointer
+
     if (fd == 1 || !valid_in_virtual_memory(buffer))
     { // fail if fd is 1 means (stdout) or in valid in virtual memory
         call_exit(-1);
@@ -384,6 +408,7 @@ int call_write(int fd, const void *buffer, unsigned size)
     struct open_file *file = sys_file(fd);
     if (file == NULL)
     {
+        //failed to open file || null pointer
         return -1;
     }
     lock_acquire(&file_lock);
@@ -394,8 +419,14 @@ int call_write(int fd, const void *buffer, unsigned size)
 
 void handle_sys_write(struct intr_frame *f)
 {
-    int fd = *((int *)f->esp + 1);
-    char *buffer = (char *)(*((int *)f->esp + 2));
+    int args[2];  // Array to store the arguments: fd and buffer pointer
+
+    // Retrieve the two arguments from the stack
+    get_args(f, args, 2);
+
+    int fd = args[0];  // First argument: file descriptor
+    char *buffer = (char *)args[1];  // Second argument: buffer pointer
+
     if (fd == 0 || !valid_in_virtual_memory(buffer))
     { // fail, if fd is 0 (stdin), or its virtual memory
         call_exit(-1);
@@ -406,8 +437,14 @@ void handle_sys_write(struct intr_frame *f)
 
 void call_seek(struct intr_frame *f)
 {
-    int fd = (int)(*((int *)f->esp + 1));
-    unsigned position = (unsigned)(*((int *)f->esp + 2));
+    int args[2];  // Array to store the arguments: fd and position
+
+    // Retrieve the two arguments from the stack
+    get_args(f, args, 2);
+
+    int fd = args[0];  // First argument: file descriptor
+    unsigned position = (unsigned)args[1];  // Second argument: position
+
     struct open_file *file = sys_file(fd);
     if (file == NULL)
     {
@@ -427,7 +464,12 @@ void handle_sys_seek(struct intr_frame *f)
 
 void call_tell(struct intr_frame *f)
 {
-    int fd = (int)(*((int *)f->esp + 1));
+    int args[1];  // Array to store the arguments: fd
+
+    // Retrieve the two arguments from the stack
+    get_args(f, args, 1);
+
+    int fd = args[0];  // First argument: file descriptor
     struct open_file *file = sys_file(fd);
     if (file == NULL)
     {
@@ -460,7 +502,12 @@ int call_close(int fd)
 
 void handle_sys_close(struct intr_frame *f)
 {
-    int fd = (int)(*((int *)f->esp + 1));
+    int args[1];  // Array to store the arguments: fd
+
+    // Retrieve the one argument from the stack
+    get_args(f, args, 1);
+
+    int fd = args[0];  // First argument: file descriptor
     if (fd < 2)
     { // fail, the fd is stdin or stdout
         call_exit(-1);
