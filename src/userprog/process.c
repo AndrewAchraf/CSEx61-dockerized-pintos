@@ -65,6 +65,7 @@ process_execute (const char *file_name)
     /*When the child is done loading the executable file, the parent should check if the child made it or not*/
     if (!thread_current()->child_success_creation){
         return TID_ERROR;
+        sema_up(&thread_current()->sync_between_child_parent);
     }
 
     if (tid == TID_ERROR)
@@ -96,6 +97,7 @@ start_process (void *file_name_)
     if (!success){
         thread_current()->parent->child_success_creation = false;
         sema_up(&thread_current()->parent->sync_between_child_parent);
+        sema_down(&thread_current()->sync_between_child_parent);
     }
 
     /* if the child made it and loaded the executable file, then we should add it to the children list of the parent */
