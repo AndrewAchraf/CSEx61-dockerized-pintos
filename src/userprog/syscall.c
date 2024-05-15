@@ -31,7 +31,7 @@ bool valid_esp(struct intr_frame *f);
 void get_args (struct intr_frame *f, int *arg, int num_of_args);
 
 void
-syscall_init (void) 
+syscall_init (void)
 {
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 
@@ -48,6 +48,10 @@ syscall_handler (struct intr_frame *f )
     int args[MAX_ARGS];
     switch (*(int *)f->esp)
     {
+        if(!valid_esp(f))
+        {
+            call_exit(-1);
+        }
         case SYS_HALT:
         {
             //handle halt system call
@@ -65,7 +69,7 @@ syscall_handler (struct intr_frame *f )
         case SYS_EXEC:
         {
             //handle exec system call
-
+            handle_sys_exec(f);
             break;
         }
         case SYS_WAIT:
@@ -134,7 +138,7 @@ syscall_handler (struct intr_frame *f )
         }
     }
 
-  thread_exit ();
+  //thread_exit ();
 }
 /*
  * This function checks the validity of a given pointer with three major conditions:
@@ -194,7 +198,17 @@ void handle_sys_exit(struct intr_frame *f){
     call_exit(status);
 }
 
-
+void handle_sys_exec(struct intr_frame *f)
+{
+    int arg[1];
+    get_args(f, &arg, 1);
+    char *file_name = (char *)(arg[0]);
+    if (!valid_in_virtual_memory(file_name))
+    {
+        call_exit(-1);
+    }
+    f->eax = process_execute(file_name);
+}
 
 tid_t  call_wait(tid_t tid)
 {
