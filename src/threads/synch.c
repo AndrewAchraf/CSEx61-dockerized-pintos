@@ -69,7 +69,11 @@ sema_down (struct semaphore *sema)
   while (sema->value == 0) 
     {
       //list_push_back (&sema->waiters, &thread_current ()->elem);
-        list_insert_ordered(&sema->waiters, &thread_current()->elem, compare_Priority, NULL);
+      list_insert_ordered(&(sema->waiters), &thread_current()->elem, compare_Priority, NULL);
+      list_sort(&sema->waiters, compare_Priority, NULL);
+      if(!thread_mlfqs){
+          broadcastChangeInPriority(thread_current());
+      }
       thread_block ();
     }
   sema->value--;
@@ -202,12 +206,38 @@ lock_init (struct lock *lock)
 void
 lock_acquire (struct lock *lock)
 {
-  ASSERT (lock != NULL);
-  ASSERT (!intr_context ());
-  ASSERT (!lock_held_by_current_thread (lock));
+    ASSERT (lock != NULL);
+    ASSERT (!intr_context ());
+    ASSERT (!lock_held_by_current_thread (lock));
 
-  sema_down (&lock->semaphore);
-  lock->holder = thread_current ();
+    struct thread *current_thread = thread_current();
+    /*make it waiting bec we are not sure it will take it or not*/
+    current_thread->lock_waiting = lock;
+    sema_down (&lock->semaphore);
+    lock->holder = thread_current ();
+    //see if any one else in the list of threads waiting for the same lock has higher priority
+    if(!thread_mlfqs){
+        /*-------  Priority Schedule and Donation    --------*/
+
+        /* the thread no longer waits for the lock.
+         * it acquired the lock */
+        current_thread -> lock_waiting = NULL;
+        if(!list_empty(&lock->semaphore.waiters)){
+            /* if there is other threads waiting for the same lock check priority
+             * make the max priority with the priority of thread with max priority in waiters*/
+            lock->maxPriority = list_entry(list_front(&lock->semaphore.waiters), struct thread, elem)->priority;
+        }
+        else{
+            /*no one is waiting for the same lock and its aquired now by the current thread
+             * so set max priority for lock to MIN_PRI which is actually 0.*/
+            lock->maxPriority = PRI_MIN;
+        }
+        //add the lock to the list of acquired locks of the current thread in descending order according to the priority holder.
+        list_insert_ordered(&lock->holder->locks_held, &lock->elem, cmp_locks_priority, NULL);
+    }
+
+
+
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -219,15 +249,15 @@ lock_acquire (struct lock *lock)
 bool
 lock_try_acquire (struct lock *lock)
 {
-  bool success;
+    bool success;
 
-  ASSERT (lock != NULL);
-  ASSERT (!lock_held_by_current_thread (lock));
+    ASSERT (lock != NULL);
+    ASSERT (!lock_held_by_current_thread (lock));
 
-  success = sema_try_down (&lock->semaphore);
-  if (success)
-    lock->holder = thread_current ();
-  return success;
+    success = sema_try_down (&lock->semaphore);
+    if (success)
+        lock->holder = thread_current ();
+    return success;
 }
 
 /* Releases LOCK, which must be owned by the current thread.
@@ -235,14 +265,23 @@ lock_try_acquire (struct lock *lock)
    An interrupt handler cannot acquire a lock, so it does not
    make sense to try to release a lock within an interrupt
    handler. */
+
 void
 lock_release (struct lock *lock) 
 {
-  ASSERT (lock != NULL);
-  ASSERT (lock_held_by_current_thread (lock));
+    ASSERT (lock != NULL);
+    ASSERT (lock_held_by_current_thread (lock));
+    if(!thread_mlfqs){
+        //remove the lock from the list of acquired locks of the current thread.
+        list_remove(&lock->elem);
+        //the thread holding the lock now left t so make threads know this and check priority
+        broadcastChangeInPriority(lock->holder);
 
-  lock->holder = NULL;
-  sema_up (&lock->semaphore);
+        lock->maxPriority = PRI_MIN;
+    }
+    /*now lock isn't held*/
+    lock->holder = NULL;
+    sema_up (&lock->semaphore);
 }
 
 /* Returns true if the current thread holds LOCK, false
@@ -354,6 +393,7 @@ cond_broadcast (struct condition *cond, struct lock *lock)
   while (!list_empty (&cond->waiters))
     cond_signal (cond, lock);
 }
+
 /*compares the priority of the threads in the waiters list of the semaphore
  * bec the list of cond inserts semaphore elements which contains the list of waiters so in each element of list
  * in cond waiting list the element is a semaphore element so we need to get the first element in the semaphore list
@@ -367,3 +407,57 @@ bool cmp_cond_priority(struct list_elem *first, struct list_elem *second, void *
     return list_entry(list_front(&fsem->semaphore.waiters), struct thread, elem)->priority > list_entry (list_front(&ssem->semaphore.waiters), struct thread, elem)->priority;
 
 }
+/* sorts the list of locks aquired by the current thread for retrieval in descending order */
+bool cmp_locks_priority(struct list_elem *first, struct list_elem *second, void *aux)
+{
+    struct lock *flock = list_entry (first, struct lock, elem);
+    struct lock *slock = list_entry (second, struct lock, elem);
+
+    return flock->maxPriority > slock->maxPriority;
+
+}
+/*
+ * Called by a lock to notify its holder thread of a change in priority,
+ * so the thread check the new priority and chooses the appropriate new priority.
+ */
+void broadcastChangeInPriority(struct  thread* t){
+    if(!list_empty(&(t->locks_held))){
+        /* if the thread holds another locks it sets its priority to the max bet its actual priority or
+         * the max in the list of the held threads
+         * */
+        int maxPriorityInWaiters = (list_entry(list_front(&(t->locks_held)),
+        struct lock, elem))->maxPriority;
+        if (t->actual_priority > maxPriorityInWaiters)
+            t->priority = t ->actual_priority;
+        else
+            t->priority = maxPriorityInWaiters;
+    }
+    else{
+        //if not holding any thread so it rebase to its actual priority
+        t->priority = t->actual_priority;
+    }
+    handleNestedDonation(t);
+}
+// Handles the nested donation procedure
+void
+handleNestedDonation(struct thread* t){
+    if (t->lock_waiting == NULL)
+        //thread not waiting for anything
+        return;
+
+    list_remove(&t->elem);
+    list_insert_ordered(&t->lock_waiting->semaphore.waiters, &t->elem, compare_Priority, NULL);
+
+    if (t->lock_waiting->maxPriority < t->priority)
+        t->lock_waiting->maxPriority = t->priority;
+
+    if (t->lock_waiting->holder != NULL) {
+        int maxPriority = list_entry(list_front(&t->lock_waiting->semaphore.waiters), struct thread, elem)->priority;
+        if (t->lock_waiting->holder->priority >= maxPriority)
+            return;
+
+        t->lock_waiting->holder->priority = maxPriority;
+        handleNestedDonation(t->lock_waiting->holder);
+    }
+}
+
