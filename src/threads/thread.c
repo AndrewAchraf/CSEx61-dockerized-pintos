@@ -246,9 +246,13 @@ thread_create (const char *name, int priority,
     if (t == NULL)
         return TID_ERROR;
 
-    /* Initialize thread. */
-    init_thread (t, name, priority);
-    tid = t->tid = allocate_tid ();
+  /* Initialize thread. */
+  init_thread (t, name, priority);
+  tid = t->tid = allocate_tid ();
+
+  /*Add the child to the parent's children list*/
+//  struct thread *parent_thread = thread_current();
+//  t->parent = parent_thread;
 
     /* Stack frame for kernel_thread(). */
     kf = alloc_frame (t, sizeof *kf);
@@ -602,6 +606,22 @@ init_thread (struct thread *t, const char *name, int priority)
 
     t->actual_priority = priority;
 
+
+/*----------INITIALIZE-------------*/
+
+    sema_init(&t->wait_for_child_exit,0);
+    sema_init(&t->wait_for_child_creation,0);
+    list_init(&t->children);
+    list_init(&t->list_of_open_file);
+    t->tid_waiting_for = -1;
+    t->child_status = -1;
+    t->child_created_successfully = 0;
+    t->exit_status = 0;
+    if(t != initial_thread) {
+        t->parent = thread_current();
+    }
+    else t->parent = NULL;
+/*--------------------------------------*/
 
     old_level = intr_disable ();
     list_push_back (&all_list, &t->allelem);
