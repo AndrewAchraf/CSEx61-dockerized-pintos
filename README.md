@@ -61,6 +61,6 @@ modifications of `src` in the branches `threads-dockerized` and `userprog-docker
 * [Andrew Achraf](https://github.com/AndrewAchraf)
 * [Pierre Jack](https://github.com/Pierre-Jack) 
 * [Karene Antoine](https://github.com/Karene-Antoine)  
-* [Habiba Tarek](https://github.com)  
+* [Habiba Tarek](https://github.com/habibatarek26)  
 
  
