@@ -52,3 +52,13 @@ Here's a list of sessions I made (in Arabic) for Alexandria University, explaini
 Below is a student's guide on utilizing Git.
 
 1. [ArmaGit](https://github.com/Armaritto/ArmaGit)
+
+## Contributors:
+
+modifications of `src` int the branches `threads-dockerized` and `userprog-dockerized`  from the original `src` is done by CSED26 Students:
+
+* [Amir Ragaie](https://github.com/Amir-Ragaie)
+* [Andrew Achraf](https://github.com/AndrewAchraf)
+* [Pierre Jack](https://github.com/Pierre-Jack) 
+* [Karene Antoine](https://github.com/Karene-Antoine)  
+* [Habiba Tarek](https://github.com)  
