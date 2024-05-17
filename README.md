@@ -55,7 +55,7 @@ Below is a student's guide on utilizing Git.
 
 ## Contributors:
 
-modifications of `src` int the branches `threads-dockerized` and `userprog-dockerized`  from the original `src` is done by CSED26 Students:
+modifications of `src` in the branches `threads-dockerized` and `userprog-dockerized`  from the original `src` is done by CSED26 Students:
 
 * [Amir Ragaie](https://github.com/Amir-Ragaie)
 * [Andrew Achraf](https://github.com/AndrewAchraf)
